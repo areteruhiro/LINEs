@@ -18,6 +18,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # Make sure the release step uses its own credentials:
+          # https://github.com/cycjimmy/semantic-release-action#private-packages
           persist-credentials: false
           fetch-depth: 0
 
@@ -29,16 +31,6 @@ jobs:
 
       - name: Cache Gradle
         uses: burrunan/gradle-cache-action@v2
-
-      - name: Import GPG key (修正箇所)
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          git_config_global: true  # Git設定をグローバルに適用
-          git_user_signingkey: true  # 署名キーを設定
-          git_commit_gpgsign: true  # コミット署名を有効化
-          git_tag_gpgsign: true  # タグ署名を有効化
 
       - name: Build
         env:
@@ -54,16 +46,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Verify GPG (デバッグ用追加ステップ)
-        run: |
-          gpg --list-secret-keys --keyid-format LONG
-          git config --global user.signingkey
-          git config --global commit.gpgsign
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          fingerprint: ${{ vars.GPG_FINGERPRINT }}
 
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}  # 必要に応じて追加
-        run: |
-          npm exec semantic-release
-          git push --follow-tags
+        run: npm exec semantic-release
