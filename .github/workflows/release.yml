@@ -13,61 +13,47 @@ jobs:
     permissions:
       contents: write
       packages: write
-      actions: read
     runs-on: ubuntu-latest
-    environment: production
-    timeout-minutes: 30
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # Make sure the release step uses its own credentials:
+          # https://github.com/cycjimmy/semantic-release-action#private-packages
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
-          cache: gradle
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Cache Gradle
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+        uses: burrunan/gradle-cache-action@v2
 
-      - name: Build and test
-        run: ./gradlew clean build check
+      - name: Build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew build clean
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
-          cache: npm
+          node-version: "lts/*"
+          cache: 'npm'
 
-      - name: Install release dependencies
-        run: npm ci --ignore-scripts
-        working-directory: ./release-config
+      - name: Install dependencies
+        run: npm install
 
-      - name: Configure GPG
+      - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GITHUB_TOKEN }}  # GPG_PASSPHRASEを別途用意することを推奨
-          git_user_signingkey: true
-          git_commit_gpgsign: true
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          fingerprint: ${{ vars.GPG_FINGERPRINT }}
 
-      - name: Semantic Release
+      - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
-        run: npx semantic-release
-        working-directory: ./release-config
+        run: npm exec semantic-release
