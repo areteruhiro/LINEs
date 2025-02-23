@@ -1,4 +1,4 @@
-package app.revanced.patches.example
+package app.revanced.patches.line
 
 import app.revanced.patcher.patch.bytecodePatch
 import app.revanced.patcher.patch.annotation.Patch
@@ -66,3 +66,27 @@ object LinePackageSpoofPatch : BytecodePatch() {
         }
     }
 }
+package app.revanced.patches.example
+
+import android.content.pm.PackageManager
+import java.security.MessageDigest
+
+object `PackageSpoofUtils.kt` {
+    // LINE固有の偽装設定
+    private const val SPOOFED_PACKAGE_NAME = "jp.naver.line.android"
+    private const val OFFICIAL_SIGNATURE_SHA256 = "e682fe0bcd60907dfed515e0b8a4de03aa1c281d111a07833986602b6098afd2"
+
+    /**
+     * パッケージ名を偽装
+     */
+    @JvmStatic
+    fun spoofPackageName(pm: PackageManager, originalName: String): String {
+        return when {
+            originalName.startsWith("jp.naver.line") -> SPOOFED_PACKAGE_NAME
+            else -> originalName
+        }.also {
+            if (it != originalName) {
+                println("[Spoof] Package name changed: $originalName -> $it")
+            }
+        }
+    }
