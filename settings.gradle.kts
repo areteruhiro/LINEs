@@ -16,5 +16,12 @@ pluginManagement {
 }
 
 plugins {
-    id("app.revanced.patches") version "1.0.0-dev.5"
+    id("app.revanced.library.patches") version "17.0.0"
+}
+
+dependencies {
+    implementation("app.revanced:revanced-patcher:17.0.0")
+    implementation("org.jf.dexlib2:dexlib2:2.5.2")
+    implementation("org.smali:smali:2.5.2")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
 }
