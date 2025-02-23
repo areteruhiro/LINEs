@@ -16,9 +16,8 @@ pluginManagement {
 }
 
 plugins {
-    id("app.revanced.library.patches") version "17.0.0"
+    id("app.revanced.patches") version "1.0.0-dev.5"
 }
-
 dependencies {
     implementation("app.revanced:revanced-patcher:17.0.0")
     implementation("org.jf.dexlib2:dexlib2:2.5.2")
