@@ -16,13 +16,6 @@ repositories {
 
 dependencies {
     implementation(libs.revanced.patcher)
-    implementation(libs.smali)
-    // TODO: Required because build fails without it. Find a way to remove this dependency.
-    implementation(libs.guava)
-    // Used in JsonGenerator.
-    implementation(libs.gson)
-
-    // A dependency to the Android library unfortunately fails the build, which is why this is required.
     compileOnly(project("dummy"))
 }
 
