@@ -3,63 +3,82 @@ name: Release
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - dev
+    branches: [main, dev]
   pull_request:
-    branches:
-      - main
-      - dev
-      
+    branches: [main, dev]
+
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
+  packages: write
+  actions: write
 
 jobs:
-  release:
-    name: Release
+  build:
+    name: Build and Publish
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Make sure the release step uses its own credentials:
-          # https://github.com/cycjimmy/semantic-release-action#private-packages
-          persist-credentials: false
           fetch-depth: 0
 
-      - name: Cache Gradle
-        uses: burrunan/gradle-cache-action@v1
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Build with Gradle
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew generatePatchesFiles clean
+      - name: Gradle Cache
+        uses: gradle/gradle-build-action@v2
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-       - name: Upload patches jar
-         uses: actions/upload-artifact@v4
-         with:
-           name: patches
-           path: build/libs/*.jar
+      - name: Build Patches
+        run: ./gradlew generatePatchesFiles
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: patches-${{ github.sha }}
+          path: |
+            build/libs/*.jar
+            build/outputs/**/*
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: patches-${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version: 'lts/*'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install Dependencies
+        run: npm ci
 
-      - name: Release
+      - name: Semantic Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm exec semantic-release
+          GITHUB_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN }}
+        run: npx semantic-release
 
-      - name: Run apk build
-        run: |          
-          curl -X POST https://api.github.com/repos/crimera/piko-builds/dispatches \
-          -H 'Accept: application/vnd.github+json' \
-          -H "Authorization: Bearer ${{ secrets.ACCESS_TOKEN }}" \
-          -d '{"event_type": "build"}'
+  trigger-apk-build:
+    name: Trigger APK Build
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Build Workflow
+        uses: convictional/trigger-workflow-and-wait@v1
+        with:
+          owner: crimera
+          repo: piko-builds
+          github_token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          workflow_file_name: build-apk.yml
+          wait_workflow: true
+          wait_workflow_timeout: 600
