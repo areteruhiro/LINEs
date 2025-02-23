@@ -1,7 +1,7 @@
 import org.gradle.kotlin.dsl.support.listFilesOrdered
 
 plugins {
-    kotlin("jvm") version "1.9.22"
+    kotlin("jvm") version "1.9.22"  // Kotlin安定版を使用
     `maven-publish`
 }
 
@@ -15,14 +15,11 @@ repositories {
 }
 
 dependencies {
-    implementation("org.jf.dexlib2:dexlib2:2.5.2")
-    implementation("com.google.guava:guava:32.1.3-jre")
-    implementation("com.google.code.gson:gson:2.10.1")
-    implementation("org.smali:smali:2.5.2")
+    compileOnly(project("dummy"))
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(17)  // Java 17に更新
 }
 
 tasks.withType<Jar> {
@@ -38,61 +35,39 @@ tasks.withType<Jar> {
     }
 }
 
-tasks {
-    register<DefaultTask>("generateBundle") {
-        dependsOn("jar")
+tasks.register<DefaultTask>("generateBundle") {
+    dependsOn("jar")
 
-        doLast {
-            val androidHome = System.getenv("ANDROID_HOME") 
-                ?: throw GradleException("ANDROID_HOME environment variable not set")
-            
-            val buildToolsDir = File(androidHome, "build-tools")
-            val buildTools = buildToolsDir.listFilesOrdered()
-                ?.lastOrNull()
-                ?: throw GradleException("No Android build-tools found in $buildToolsDir")
+    doLast {
+        val androidHome = System.getenv("ANDROID_HOME") ?: throw GradleException("ANDROID_HOME environment variable not set")
+        val buildTools = File(androidHome, "build-tools").listFilesOrdered()?.last()
+            ?: throw GradleException("No Android build-tools found")
 
-            val d8 = File(buildTools, "d8").takeIf { it.exists() }
-                ?: throw GradleException("d8 tool not found in $buildTools")
+        val d8 = File(buildTools, "d8").takeIf { it.exists() }?.absolutePath
+            ?: throw GradleException("d8 tool not found")
 
-        
-            val outputDir = layout.buildDirectory.dir("libs").get().asFile
+        val jarFile = tasks.jar.get().archiveFile.get().asFile
+        val outputDir = layout.buildDirectory.dir("libs").get().asFile
 
-            exec {
-                workingDir = outputDir
-                commandLine(d8, "--release", "--output", outputDir.absolutePath, jarFile.absolutePath)
-            }
-
-            exec {
-                workingDir = outputDir
-                commandLine("zip", "-uj", jarFile.absolutePath, "classes.dex")
-            }
+        exec {
+            workingDir = outputDir
+            commandLine(d8, "--release", "--output", outputDir.absolutePath, jarFile.absolutePath)
         }
-    }
 
-    register<JavaExec>("generatePatchesFiles") {
-        group = "revanced"
-        description = "Generate patches metadata files"
-        
-        classpath = sourceSets["main"].runtimeClasspath
-        mainClass.set("app.revanced.generator.MainKt")
-        
-        dependsOn("build")
-        
-        inputs.files(sourceSets["main"].allSource.srcDirs)
-        outputs.dir(layout.buildDirectory.dir("generated/patches"))
-        
-        doFirst {
-            mkdir(layout.buildDirectory.dir("generated/patches"))
+        exec {
+            workingDir = outputDir
+            commandLine("zip", "-uj", jarFile.absolutePath, "classes.dex")
         }
     }
 }
 
 publishing {
     publications {
-        create<MavenPublication>("revanced-patches-publication") {
-            artifactId = "line-patches"
+        create<MavenPublication>("linePatches") {
             from(components["java"])
-            
+            artifactId = "line-patches"
+            version = project.version.toString()
+
             pom {
                 name = "LINE ReVanced Patches"
                 description = "Custom patches for LINE app modifications"
