@@ -1,10 +1,8 @@
 plugins {
-    id("app.revanced.library.patches") version "17.0.0"
     id("org.jetbrains.kotlin.jvm") version "1.9.0"
 }
 
 dependencies {
-    implementation("app.revanced:revanced-patcher:17.0.0")
     implementation("org.jf.dexlib2:dexlib2:2.5.2")
     implementation("org.smali:smali:2.5.2")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
