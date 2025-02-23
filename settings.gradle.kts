@@ -1,26 +1,25 @@
-rootProject.name = "revanced-patches-template"
-
 pluginManagement {
     repositories {
         gradlePluginPortal()
         google()
         maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/revanced/registry")
-            credentials {
-                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
-                password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
-            }
+            url = uri("https://maven.revanced.app/repository")
         }
     }
 }
 
-plugins {
-    id("app.revanced.patches") version "1.0.0-dev.5"
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url = uri("https://maven.revanced.app/repository")
+        }
+    }
 }
-dependencies {
-    implementation("app.revanced:revanced-patcher:17.0.0")
-    implementation("org.jf.dexlib2:dexlib2:2.5.2")
-    implementation("org.smali:smali:2.5.2")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
-}
+
+rootProject.name = "LINEs"
+
+include(":app")
+include(":patches")
