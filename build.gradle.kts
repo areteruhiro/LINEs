@@ -15,7 +15,6 @@ repositories {
 }
 
 dependencies {
-    implementation("app.revanced:revanced-patcher:17.0.0")
     implementation("org.jf.dexlib2:dexlib2:2.5.2")
     implementation("com.google.guava:guava:32.1.3-jre")
     implementation("com.google.code.gson:gson:2.10.1")
