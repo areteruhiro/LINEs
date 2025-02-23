@@ -13,47 +13,73 @@ jobs:
     permissions:
       contents: write
       packages: write
+      actions: read
     runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Make sure the release step uses its own credentials:
-          # https://github.com/cycjimmy/semantic-release-action#private-packages
-          persist-credentials: false
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "17"
+          distribution: temurin
+          java-version: 17
+          cache: gradle
 
       - name: Cache Gradle
-        uses: burrunan/gradle-cache-action@v2
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-      - name: Build
+      - name: Build and generate JAR
+        run: ./gradlew clean build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew build clean
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: line-patches
+          path: build/libs/*.jar
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
-          cache: 'npm'
+          node-version: lts/*
+          cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install release tools
+        run: npm ci --ignore-scripts
+        working-directory: ./release-config
 
-      - name: Import GPG key
+      - name: Configure GPG signing
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          fingerprint: ${{ vars.GPG_FINGERPRINT }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
 
-      - name: Release
+      - name: Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm exec semantic-release
+          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+        run: npx semantic-release
+        working-directory: ./release-config
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/libs/*.jar
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
