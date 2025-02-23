@@ -3,82 +3,71 @@ name: Release
 on:
   workflow_dispatch:
   push:
-    branches: [main, dev]
-  pull_request:
-    branches: [main, dev]
-
-permissions:
-  contents: write
-  packages: write
-  actions: write
+    branches:
+      - main
+      - dev
 
 jobs:
-  build:
-    name: Build and Publish
+  release:
+    name: Release
+    permissions:
+      contents: write
+      packages: write
+      actions: read
     runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: 17
+          cache: gradle
 
-      - name: Gradle Cache
-        uses: gradle/gradle-build-action@v2
+      - name: Cache Gradle
+        uses: actions/cache@v3
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-
-      - name: Build Patches
-        run: ./gradlew generatePatchesFiles
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: patches-${{ github.sha }}
           path: |
-            build/libs/*.jar
-            build/outputs/**/*
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-  release:
-    name: Publish Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: patches-${{ github.sha }}
+      - name: Build and test
+        run: ./gradlew clean build check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: lts/*
+          cache: npm
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: Install release dependencies
+        run: npm ci --ignore-scripts
+        working-directory: ./release-config
+
+      - name: Configure GPG
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GITHUB_TOKEN }}  # GPG_PASSPHRASEを別途用意することを推奨
+          git_user_signingkey: true
+          git_commit_gpgsign: true
 
       - name: Semantic Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
         run: npx semantic-release
-
-  trigger-apk-build:
-    name: Trigger APK Build
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Build Workflow
-        uses: convictional/trigger-workflow-and-wait@v1
-        with:
-          owner: crimera
-          repo: piko-builds
-          github_token: ${{ secrets.REPO_ACCESS_TOKEN }}
-          workflow_file_name: build-apk.yml
-          wait_workflow: true
-          wait_workflow_timeout: 600
+        working-directory: ./release-config
