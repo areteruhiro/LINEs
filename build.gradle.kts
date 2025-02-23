@@ -15,7 +15,6 @@ repositories {
 }
 
 dependencies {
-    implementation(libs.revanced.patcher)
     compileOnly(project("dummy"))
 }
 
