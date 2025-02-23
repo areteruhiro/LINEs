@@ -3,7 +3,6 @@ import org.gradle.kotlin.dsl.support.listFilesOrdered
 plugins {
     kotlin("jvm") version "1.9.22"  // Kotlin安定版を使用
     `maven-publish`
-     id("app.revanced.library.patches") version "17.0.0" apply false
 }
 
 group = "app.revanced.patches.line"
