@@ -1,49 +1,33 @@
 import org.gradle.kotlin.dsl.support.listFilesOrdered
 
 plugins {
-    kotlin("jvm") version "1.9.0"  // Kotlinバージョンを安定版に変更
+    kotlin("jvm") version "2.0.0"
     `maven-publish`
-    id("com.android.library") version "8.2.0"  // Androidライブラリプラグイン追加
 }
 
-group = "app.revanced.patches.line"
+group = "crimera"
 
 repositories {
     mavenCentral()
+    mavenLocal()
     google()
-    maven("https://maven.revanced.app/repository")
-    maven("https://jitpack.io")
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
-    implementation("app.revanced:revanced-patcher:17.0.0") {
-        exclude(group = "org.smali", module = "smali")
-    }
-    implementation("org.jf.dexlib2:dexlib2:2.5.2")
-    implementation("org.smali:smali:2.5.2")
-    implementation("com.google.guava:guava:32.1.3-jre")
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.revanced.patcher)
+    implementation(libs.smali)
+    // TODO: Required because build fails without it. Find a way to remove this dependency.
+    implementation(libs.guava)
+    // Used in JsonGenerator.
+    implementation(libs.gson)
 
-    // Androidツールチェーン
-    compileOnly("com.android.tools.build:gradle:8.2.0")
+    // A dependency to the Android library unfortunately fails the build, which is why this is required.
+    compileOnly(project("dummy"))
 }
 
 kotlin {
-    jvmToolchain(17)  // Java 17に更新
-}
-
-android {
-    namespace = "app.revanced.patches.line"
-    compileSdk = 33
-
-    defaultConfig {
-        minSdk = 24
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+    jvmToolchain(11)
 }
 
 tasks.withType<Jar> {
