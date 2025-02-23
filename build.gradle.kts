@@ -69,7 +69,7 @@ publishing {
             version = project.version.toString()
 
             pom {
-                name = "LINE ReVanced Patches"
+                name = "LIMEs"
                 description = "Custom patches for LINE app modifications"
                 url = "https://github.com/areteruhiro/LINEs"
 
@@ -83,7 +83,7 @@ publishing {
                 developers {
                     developer {
                         id = "your-github-id"
-                        name = "Your Name"
+                        name = "areteruhiro"
                         email = "your.email@example.com"
                     }
                 }
