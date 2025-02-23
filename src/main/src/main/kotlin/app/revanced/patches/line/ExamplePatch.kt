@@ -5,16 +5,15 @@ import app.revanced.patcher.patch.BytecodePatch
 import app.revanced.patcher.patch.annotation.Patch
 import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
 import org.jf.dexlib2.Opcode
+import org.jf.dexlib2.iface.instruction.ReferenceInstruction
 import org.jf.dexlib2.iface.ClassDef
 import org.jf.dexlib2.iface.Method
-import org.jf.dexlib2.iface.instruction.ReferenceInstruction
-import android.content.pm.PackageManager
 import java.security.MessageDigest
 
 @Patch(
     name = "LINE Package Spoof",
     description = "LINEのパッケージ情報と署名を偽装するパッチ",
-    compatiblePackages = [CompatiblePackage("jp.naver.line.android")]
+    compatiblePackages = [app.revanced.patcher.patch.CompatiblePackage("jp.naver.line.android")]
 )
 object LinePackageSpoofPatch : BytecodePatch() {
 
@@ -29,7 +28,7 @@ object LinePackageSpoofPatch : BytecodePatch() {
                     if (instruction.opcode == Opcode.CONST_STRING) {
                         val string = (instruction as ReferenceInstruction).reference.toString()
                         if (string.startsWith("jp.naver.line")) {
-                            method.replaceInstruction(
+                            (method as MutableMethod).replaceInstruction(
                                 index,
                                 "const-string v0, \"$TARGET_PACKAGE\""
                             )
@@ -56,7 +55,7 @@ object LinePackageSpoofPatch : BytecodePatch() {
                 "getPackageInfo" -> method.addInstructions(
                     0,
                     """
-                    invoke-static {p1}, ${this::class.java.name.replace('.', '/')}->spoofPackageName(Landroid/content/pm/PackageManager;Ljava/lang/String;)Ljava/lang/String;
+                    invoke-static {p1}, ${this::class.java.name.replace('.', '/')}->spoofPackageName(Ljava/lang/String;)Ljava/lang/String;
                     move-result-object p1
                     """
                 )
@@ -71,7 +70,7 @@ object LinePackageSpoofPatch : BytecodePatch() {
     }
 
     @JvmStatic
-    fun spoofPackageName(pm: PackageManager, originalName: String): String {
+    fun spoofPackageName(originalName: String): String {
         return if (originalName.startsWith("jp.naver.line")) TARGET_PACKAGE else originalName
     }
 
@@ -79,7 +78,7 @@ object LinePackageSpoofPatch : BytecodePatch() {
     fun spoofSignature(signatures: ByteArray): ByteArray {
         return try {
             if (sha256(signatures) != SPOOFED_SIGNATURE) {
-                // 実際の実装では正規の署名データを返す
+                // 実際の実装では正規の署名データを復号して返す
                 signatures
             } else {
                 signatures
