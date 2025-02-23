@@ -1,6 +1,6 @@
 include("dummy")
 
-rootProject.name = "piko-twitter-patches"
+rootProject.name = "lines"
 
 buildCache {
     local {
