@@ -5,7 +5,7 @@ plugins {
     `maven-publish`
 }
 
-group = "crimera"
+group = "limes"
 
 repositories {
     mavenCentral()
