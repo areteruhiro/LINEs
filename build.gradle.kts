@@ -54,7 +54,7 @@ tasks {
             val d8 = File(buildTools, "d8").takeIf { it.exists() }
                 ?: throw GradleException("d8 tool not found in $buildTools")
 
-            val jarFile = tasks.jar.get().archiveFile.get().asFile
+        
             val outputDir = layout.buildDirectory.dir("libs").get().asFile
 
             exec {
