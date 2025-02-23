@@ -16,12 +16,15 @@ repositories {
 }
 
 dependencies {
-    implementation("app.revanced:revanced-patcher:17.0.0")
-    implementation("org.jf.dexlib2:dexlib2:2.5.2")
-    implementation("org.smali:smali:2.5.2") {
-        exclude(group = "com.google.guava")
-    }
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.revanced.patcher)
+    implementation(libs.smali)
+    // TODO: Required because build fails without it. Find a way to remove this dependency.
+    implementation(libs.guava)
+    // Used in JsonGenerator.
+    implementation(libs.gson)
+
+    // A dependency to the Android library unfortunately fails the build, which is why this is required.
+    compileOnly(project("dummy"))
 }
 
 kotlin {
