@@ -1,33 +1,31 @@
 import org.gradle.kotlin.dsl.support.listFilesOrdered
 
 plugins {
-    kotlin("jvm") version "2.0.0"
+    kotlin("jvm") version "1.9.22"  // Kotlin安定版を使用
     `maven-publish`
+    id("app.revanced.library.patches") version "17.0.0"
 }
 
-group = "limes"
+group = "app.revanced.patches.line"
 
 repositories {
     mavenCentral()
-    mavenLocal()
     google()
-    maven { url = uri("https://jitpack.io") }
+    maven(url = "https://maven.revanced.app/repository")
+    maven(url = "https://jitpack.io")
 }
 
 dependencies {
-    implementation(libs.revanced.patcher)
-    implementation(libs.smali)
-    // TODO: Required because build fails without it. Find a way to remove this dependency.
-    implementation(libs.guava)
-    // Used in JsonGenerator.
-    implementation(libs.gson)
-
-    // A dependency to the Android library unfortunately fails the build, which is why this is required.
-    compileOnly(project("dummy"))
+    implementation("app.revanced:revanced-patcher:17.0.0")
+    implementation("org.jf.dexlib2:dexlib2:2.5.2")
+    implementation("org.smali:smali:2.5.2") {
+        exclude(group = "com.google.guava")
+    }
+    implementation("com.google.code.gson:gson:2.10.1")
 }
 
 kotlin {
-    jvmToolchain(11)
+    jvmToolchain(17)  // Java 17に更新
 }
 
 tasks.withType<Jar> {
@@ -36,7 +34,6 @@ tasks.withType<Jar> {
             "Name" to "LINE ReVanced Patches",
             "Description" to "LINE customization patches for ReVanced",
             "Version" to project.version,
-            "Timestamp" to System.currentTimeMillis().toString(),
             "Source" to "https://github.com/areteruhiro/LINEs",
             "Author" to "Your Name",
             "License" to "GPL-3.0"
@@ -45,15 +42,27 @@ tasks.withType<Jar> {
 }
 
 tasks.register<DefaultTask>("generateBundle") {
-    dependsOn("assembleRelease")
+    dependsOn("jar")
 
     doLast {
-        val androidSdk = System.getenv("ANDROID_HOME") ?: throw GradleException("ANDROID_HOME not set")
-        val d8 = File(androidSdk).resolve("build-tools")
-            .listFilesOrdered().last().resolve("d8").absolutePath
+        val androidHome = System.getenv("ANDROID_HOME") ?: throw GradleException("ANDROID_HOME environment variable not set")
+        val buildTools = File(androidHome, "build-tools").listFilesOrdered()?.last()
+            ?: throw GradleException("No Android build-tools found")
+
+        val d8 = File(buildTools, "d8").takeIf { it.exists() }?.absolutePath
+            ?: throw GradleException("d8 tool not found")
+
+        val jarFile = tasks.jar.get().archiveFile.get().asFile
+        val outputDir = layout.buildDirectory.dir("libs").get().asFile
 
         exec {
-            commandLine(d8, layout.buildDirectory.file("outputs/aar/patches-release.aar").get().asFile.absolutePath)
+            workingDir = outputDir
+            commandLine(d8, "--release", "--output", outputDir.absolutePath, jarFile.absolutePath)
+        }
+
+        exec {
+            workingDir = outputDir
+            commandLine("zip", "-uj", jarFile.absolutePath, "classes.dex")
         }
     }
 }
@@ -61,14 +70,9 @@ tasks.register<DefaultTask>("generateBundle") {
 publishing {
     publications {
         create<MavenPublication>("linePatches") {
-            groupId = "app.revanced.patches"
-            artifactId = "line"
+            from(components["java"])
+            artifactId = "line-patches"
             version = project.version.toString()
-
-            artifact("$buildDir/outputs/aar/patches-release.aar") {
-                classifier = "full"
-                extension = "aar"
-            }
 
             pom {
                 name = "LINE ReVanced Patches"
@@ -92,7 +96,7 @@ publishing {
 
                 scm {
                     connection = "scm:git:git://github.com/areteruhiro/LINEs.git"
-                    developerConnection = "scm:git:ssh://github.com:areteruhiro/LINEs.git"
+                    developerConnection = "scm:git:ssh://github.com/areteruhiro/LINEs.git"
                     url = "https://github.com/areteruhiro/LINEs"
                 }
             }
