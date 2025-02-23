@@ -3,6 +3,7 @@ extension {
 }
 
 
+
 android {
     namespace = "app.revanced.extension"
 }
