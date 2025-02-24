@@ -1,4 +1,4 @@
-package app.revanced.patches.line.spoof
+package app.revanced.patches.line
 
 import app.revanced.patcher.data.BytecodeContext
 import app.revanced.patcher.patch.BytecodePatch
