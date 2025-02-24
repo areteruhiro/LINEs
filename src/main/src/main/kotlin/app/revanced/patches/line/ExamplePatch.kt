@@ -1,126 +1,108 @@
 package app.revanced.patches.line
 
-import app.revanced.patcher.data.BytecodeContext
-import app.revanced.patcher.patch.BytecodePatch
-import app.revanced.patcher.patch.annotation.Patch
-import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
-import org.jf.dexlib2.Opcode
-import org.jf.dexlib2.iface.instruction.ReferenceInstruction
-import java.security.MessageDigest
+import app.revanced.patcher.patch.Option
+import app.revanced.patches.all.misc.resources.addResources
+import app.revanced.patches.all.misc.resources.addResourcesPatch
+import app.revanced.patches.shared.misc.gms.gmsCoreSupportPatch
+import app.revanced.patches.shared.misc.settings.preference.IntentPreference
+import app.revanced.patches.line.util.Constants.LINE_PACKAGE_NAME
+import app.revanced.patches.line.util.Constants.REVANCED_LINE_PACKAGE_NAME
+import app.revanced.patches.line.util.fingerprints.CastContextFetchFingerprint
+import app.revanced.patches.line.util.fingerprints.MainActivityOnCreateFingerprint
+import app.revanced.patches.line.util.fingerprints.PrimeMethodFingerprint
+import app.revanced.patches.line.misc.settings.PreferenceScreen
+import app.revanced.patches.line.misc.settings.settingsPatch
 
-@Patch(
-    name = "LINE Package Spoof",
-    description = "LINEのパッケージ情報と署名を偽装するパッチ",
-    compatiblePackages = [app.revanced.patcher.patch.CompatiblePackage("jp.naver.line.android")]
-)
-object LinePackageSpoofPatch : BytecodePatch() {
+@Suppress("unused")
+val lineGmsCoreSupportPatch = gmsCoreSupportPatch(
+    fromPackageName = LINE_PACKAGE_NAME,
+    toPackageName = REVANCED_LINE_PACKAGE_NAME,
+    primeMethodFingerprint = PrimeMethodFingerprint,
+    earlyReturnFingerprints = setOf(
+        CastContextFetchFingerprint,
+    ),
+    mainActivityOnCreateFingerprint = MainActivityOnCreateFingerprint,
+    extensionPatch = lineExtensionPatch,
+    gmsCoreSupportResourcePatchFactory = ::lineGmsCoreSupportResourcePatch,
+) {
+    dependsOn(
+        disableUnsupportedFeaturesPatch, // LINE固有の非対応機能を無効化
+        spoofMessageStreamsPatch,
+    )
 
-    private const val TARGET_PACKAGE = "jp.naver.line.android"
-    private const val SPOOFED_SIGNATURE = "e682fe0bcd60907dfed515e0b8a4de03aa1c281d111a07833986602b6098afd2"
-
-    override fun execute(context: BytecodeContext) {
-        // パッケージ名偽装処理
-        spoofPackageNames(context)
-
-        // 署名検証バイパス処理
-        bypassSignatureVerification(context)
-
-        // PackageManagerメソッドフック
-        hookPackageManagerMethods(context)
-    }
-
-    private fun spoofPackageNames(context: BytecodeContext) {
-        context.classes.forEach { classDef ->
-            classDef.methods.forEach { method ->
-                method.implementation?.instructions?.forEachIndexed { index, instruction ->
-                    if (instruction.opcode == Opcode.CONST_STRING) {
-                        val string = (instruction as ReferenceInstruction).reference.toString()
-                        if (string.startsWith("jp.naver.line")) {
-                            (method as MutableMethod).replaceInstruction(
-                                index,
-                                "const-string v0, \"$TARGET_PACKAGE\""
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun bypassSignatureVerification(context: BytecodeContext) {
-        context.findClass("Ljp/naver/line/android/util/SignatureVerifier;")?.mutableClass?.methods
-            ?.firstOrNull { it.name == "verifySignature" }
-            ?.apply {
-                implementation = implementation?.apply {
-                    instructions.clear()
-                    addInstruction("const/4 v0, 0x1")
-                    addInstruction("return v0")
-                }
-            }
-    }
-
-    private fun hookPackageManagerMethods(context: BytecodeContext) {
-        context.findClass("Landroid/content/pm/PackageManager;")?.mutableClass?.methods?.forEach { method ->
-            when (method.name) {
-                "getPackageInfo" -> method.addInstructions(
-                    0,
-                    """
-                    invoke-static {p1}, ${this::class.java.name.replace('.', '/')}->spoofPackageName(Ljava/lang/String;)Ljava/lang/String;
-                    move-result-object p1
-                    """
-                )
-                "getPackageSignatures" -> method.addInstructions(
-                    0,
-                    """
-                    invoke-static {p0}, ${this::class.java.name.replace('.', '/')}->spoofSignature([B)[B
-                    """
-                )
-            }
-        }
-    }
-
-    @JvmStatic
-    fun spoofPackageName(originalName: String): String {
-        return if (originalName.startsWith("jp.naver.line")) TARGET_PACKAGE else originalName
-    }
-
-    override fun generateSpoofedSignature(original: ByteArray): ByteArray {
-        return try {
-            // カスタム署名オプションの値を取得
-            val targetSignature = customSignatureOption.value
-            
-            // 現在の署名ハッシュを計算
-            val currentHash = sha256(original)
-            
-            when {
-                // 現在の署名が期待値と異なる場合のみ偽装
-                currentHash != targetSignature -> {
-                    Logger.printDebug("署名を偽装: $currentHash → $targetSignature")
-                    MessageDigest.getInstance("SHA-256")
-                        .digest(targetSignature.hexToBytes())
-                }
-                // 既に期待する署名の場合は変更不要
-                else -> {
-                    Logger.printDebug("署名変更不要: $currentHash")
-                    original
-                }
-            }
-        } catch (e: Exception) {
-            Logger.printError("署名生成エラー", e)
-            original // エラー時はオリジナルを返す
-        }
-    }
-
-    // 16進文字列→ByteArray変換拡張関数
-    private fun String.hexToBytes(): ByteArray {
-        return chunked(2)
-            .map { it.toInt(16).toByte() }
-            .toByteArray() // 修正された部分
-    }
-
-    private fun sha256(bytes: ByteArray): String {
-        return MessageDigest.getInstance("SHA-256")
-            .digest(bytes)
-            .joinToString("") { "%02x".format(it) }
-    }
+    compatibleWith(
+        LINE_PACKAGE_NAME(
+            "13.5.0",
+            "13.6.1",
+            "14.0.0",
+            "14.1.1",
+            "14.2.0"
+        ),
+    )
 }
+
+private fun lineGmsCoreSupportResourcePatch(
+    gmsCoreVendorGroupIdOption: Option<String>,
+) = app.revanced.patches.shared.misc.gms.gmsCoreSupportResourcePatch(
+    fromPackageName = LINE_PACKAGE_NAME,
+    toPackageName = REVANCED_LINE_PACKAGE_NAME,
+    gmsCoreVendorGroupIdOption = gmsCoreVendorGroupIdOption,
+    spoofedPackageSignature = "e682fe0bcd60907dfed515e0b8a4de03aa1c281d111a07833986602b6098afd2",
+    executeBlock = {
+        addResources("line", "misc.gms.gmsCoreSupportResourcePatch")
+
+        val gmsCoreVendorGroupId by gmsCoreVendorGroupIdOption
+
+        PreferenceScreen.ADVANCED.addPreferences(
+            IntentPreference(
+                "microg_settings",
+                intent = IntentPreference.Intent(
+                    action = "android.intent.action.VIEW",
+                    targetClass = "org.microg.gms.ui.SettingsActivity",
+                    targetPackage = "$gmsCoreVendorGroupId.android.gms"
+                )
+            ),
+            IntentPreference(
+                "safetynet_check",
+                intent = IntentPreference.Intent(
+                    action = "android.intent.action.VIEW",
+                    targetClass = "org.microg.gms.snet.SafetyNetTestActivity",
+                    targetPackage = "$gmsCoreVendorGroupId.android.gms"
+                )
+            )
+        )
+    },
+) {
+    dependsOn(settingsPatch, addResourcesPatch)
+}
+
+// Constants.kt
+object Constants {
+    const val LINE_PACKAGE_NAME = "jp.naver.line.android"
+    const val REVANCED_LINE_PACKAGE_NAME = "app.revanced.line"
+    
+    // LINE固有の定数
+    const val LINE_SIGNATURE_HASH = "e682fe0bcd60907dfed515e0b8a4de03aa1c281d111a07833986602b6098afd2"
+    const val LINE_PERMISSION_PREFIX = "jp.naver.line.permission"
+    const val LINE_CONTENT_AUTHORITY = "jp.naver.line.provider"
+}
+
+// Fingerprints.kt
+object PrimeMethodFingerprint : MethodFingerprint(
+    returnType = "V",
+    accessFlags = AccessFlags.PUBLIC or AccessFlags.STATIC,
+    parameters = listOf("Landroid/content/Context;"),
+    strings = listOf(LINE_PACKAGE_NAME)
+)
+
+object CastContextFetchFingerprint : MethodFingerprint(
+    returnType = "Lcom/google/android/gms/cast/framework/CastContext;",
+    accessFlags = AccessFlags.PUBLIC,
+    parameters = emptyList()
+)
+
+object MainActivityOnCreateFingerprint : MethodFingerprint(
+    className = "Ljp/naver/line/android/MainActivity;",
+    accessFlags = AccessFlags.PUBLIC,
+    parameters = listOf("Landroid/os/Bundle;")
+)
