@@ -115,7 +115,7 @@ object LinePackageSpoofPatch : BytecodePatch() {
     private fun String.hexToBytes(): ByteArray {
         return chunked(2)
             .map { it.toInt(16).toByte() }
-            . .toByteArray()
+            .toByteArray() // 修正された部分
     }
 
     private fun sha256(bytes: ByteArray): String {
