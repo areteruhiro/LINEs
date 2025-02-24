@@ -6,7 +6,7 @@
     "compatiblePackages": [
       {
         "name": "jp.naver.line.android",
-        "versions": null
+        "versions": "15.1.4"
       }
     ],
     "use": true,
