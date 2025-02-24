@@ -25,6 +25,8 @@ import com.android.tools.smali.dexlib2.immutable.reference.ImmutableStringRefere
 import com.android.tools.smali.dexlib2.util.MethodUtil
 import org.w3c.dom.Element
 import org.w3c.dom.Node
+import org.jf.dexlib2.iface.ClassDef
+import org.jf.dexlib2.iface.Method
 
 private const val PACKAGE_NAME_REGEX_PATTERN = "^[a-z]\\w*(\\.[a-z]\\w*)+\$"
 
