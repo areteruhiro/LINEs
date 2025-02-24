@@ -5,7 +5,7 @@
     "compatiblePackages": [
       {
         "name": "jp.naver.line.android",
-        "versions": null  // または特定のバージョンを指定
+        "versions": null 
       }
     ],
     "use": true,
