@@ -1,4 +1,4 @@
-package app.revanced.patches.shared.misc.gms
+package app.revanced.patches.line
 
 import app.revanced.patcher.Fingerprint
 import app.revanced.patcher.extensions.InstructionExtensions.addInstructions
