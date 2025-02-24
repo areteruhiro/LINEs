@@ -6,8 +6,6 @@ import app.revanced.patcher.patch.annotation.Patch
 import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
 import org.jf.dexlib2.Opcode
 import org.jf.dexlib2.iface.instruction.ReferenceInstruction
-import org.jf.dexlib2.iface.ClassDef
-import org.jf.dexlib2.iface.Method
 import java.security.MessageDigest
 
 @Patch(
@@ -22,6 +20,16 @@ object LinePackageSpoofPatch : BytecodePatch() {
 
     override fun execute(context: BytecodeContext) {
         // パッケージ名偽装処理
+        spoofPackageNames(context)
+
+        // 署名検証バイパス処理
+        bypassSignatureVerification(context)
+
+        // PackageManagerメソッドフック
+        hookPackageManagerMethods(context)
+    }
+
+    private fun spoofPackageNames(context: BytecodeContext) {
         context.classes.forEach { classDef ->
             classDef.methods.forEach { method ->
                 method.implementation?.instructions?.forEachIndexed { index, instruction ->
@@ -37,8 +45,9 @@ object LinePackageSpoofPatch : BytecodePatch() {
                 }
             }
         }
+    }
 
-        // 署名検証バイパス処理
+    private fun bypassSignatureVerification(context: BytecodeContext) {
         context.findClass("Ljp/naver/line/android/util/SignatureVerifier;")?.mutableClass?.methods
             ?.firstOrNull { it.name == "verifySignature" }
             ?.apply {
@@ -48,8 +57,9 @@ object LinePackageSpoofPatch : BytecodePatch() {
                     addInstruction("return v0")
                 }
             }
+    }
 
-        // PackageManagerメソッドフック
+    private fun hookPackageManagerMethods(context: BytecodeContext) {
         context.findClass("Landroid/content/pm/PackageManager;")?.mutableClass?.methods?.forEach { method ->
             when (method.name) {
                 "getPackageInfo" -> method.addInstructions(
@@ -74,42 +84,39 @@ object LinePackageSpoofPatch : BytecodePatch() {
         return if (originalName.startsWith("jp.naver.line")) TARGET_PACKAGE else originalName
     }
 
-override fun generateSpoofedSignature(original: ByteArray): ByteArray {
-    return try {
-        // カスタム署名オプションの値を取得
-        val targetSignature = customSignatureOption.value
-        
-        // 現在の署名ハッシュを計算
-        val currentHash = sha256(original)
-        
-        when {
-            // 現在の署名が期待値と異なる場合のみ偽装
-            currentHash != targetSignature -> {
-                Logger.printDebug("署名を偽装: $currentHash → $targetSignature")
-                
-                // 実際の実装では正規の署名データを復号
-                MessageDigest.getInstance("SHA-256")
-                    .digest(targetSignature.hexToBytes())
-            }
+    override fun generateSpoofedSignature(original: ByteArray): ByteArray {
+        return try {
+            // カスタム署名オプションの値を取得
+            val targetSignature = customSignatureOption.value
             
-            // 既に期待する署名の場合は変更不要
-            else -> {
-                Logger.printDebug("署名変更不要: $currentHash")
-                original
+            // 現在の署名ハッシュを計算
+            val currentHash = sha256(original)
+            
+            when {
+                // 現在の署名が期待値と異なる場合のみ偽装
+                currentHash != targetSignature -> {
+                    Logger.printDebug("署名を偽装: $currentHash → $targetSignature")
+                    MessageDigest.getInstance("SHA-256")
+                        .digest(targetSignature.hexToBytes())
+                }
+                // 既に期待する署名の場合は変更不要
+                else -> {
+                    Logger.printDebug("署名変更不要: $currentHash")
+                    original
+                }
             }
+        } catch (e: Exception) {
+            Logger.printError("署名生成エラー", e)
+            original // エラー時はオリジナルを返す
         }
-    } catch (e: Exception) {
-        Logger.printError("署名生成エラー", e)
-        original // エラー時はオリジナルを返す
     }
-}
 
-// 16進文字列→ByteArray変換拡張関数
-private fun String.hexToBytes(): ByteArray {
-    return chunked(2)
-        .map { it.toInt(16).toByte() }
-        .toByteArray()
-}
+    // 16進文字列→ByteArray変換拡張関数
+    private fun String.hexToBytes(): ByteArray {
+        return chunked(2)
+            .map { it.toInt(16).toByte() }
+            . .toByteArray()
+    }
 
     private fun sha256(bytes: ByteArray): String {
         return MessageDigest.getInstance("SHA-256")
