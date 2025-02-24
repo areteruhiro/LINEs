@@ -1,4 +1,3 @@
-
 [
   {
     "name": "LINE Package Spoof",
@@ -6,12 +5,11 @@
     "compatiblePackages": [
       {
         "name": "jp.naver.line.android",
-        "versions": "15.1.4"
+        "versions": null  // または特定のバージョンを指定
       }
     ],
     "use": true,
     "requiresIntegrations": false,
     "options": []
-  },
-
+  }
 ]
