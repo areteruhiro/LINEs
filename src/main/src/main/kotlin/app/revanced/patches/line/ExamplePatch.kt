@@ -9,13 +9,32 @@ import app.revanced.patches.shared.settings.settingsPatch
 import app.revanced.util.valueOrThrow
 
 // LINEのMainActivityフィンガープリントを直接宣言
-val mainActivityFingerprint = object {
-    val second = "LINEのMainActivityフィンガープリントに関する情報" // 実際のフィンガープリント情報をここに設定
-}
+internal val mainActivityFingerprint = legacyFingerprint(
+    name = "lineMainActivityFingerprint",
+    returnType = "V",
+    parameters = listOf("Landroid/os/Bundle;"),
+    strings = listOf(
+        "android.intent.action.MAIN",
+        "FEline_home"
+    ),
+    customFingerprint = { method, classDef ->
+        method.name == "onCreate" && classDef.endsWith("Activity;")
+    }
+)
 
 // LINE用の拡張パッチを直接宣言
 val sharedExtensionPatch = object {
-    // ここにLINE用の拡張パッチの実装を追加
+    // LINE用のapplicationInitHook
+    val applicationInitHook = app.revanced.patches.line.utils.extension.hooks.applicationInitHook
+
+    // LINE用のcronetEngineContextHook
+    val cronetEngineContextHook = app.revanced.patches.shared.extension.hooks.cronetEngineContextHook
+
+    // LINE用のfirebaseInitProviderContextHook
+    val firebaseInitProviderContextHook = app.revanced.patches.shared.extension.hooks.firebaseInitProviderContextHook
+
+    // LINE用のmainActivityBaseContextHook
+    val mainActivityBaseContextHook = app.revanced.patches.line.utils.extension.hooks.mainActivityBaseContextHook
 }
 
 @Suppress("unused")
@@ -33,7 +52,7 @@ private fun gmsCoreSupportResourcePatch(
     packageNameLineOption: Option<String>
 ) = app.revanced.patches.shared.gms.gmsCoreSupportResourcePatch(
     fromPackageName = "jp.naver.line.android", // LINEのパッケージ名
-    spoofedPackageSignature = "LINEのAPK署名に置き換え", // LINEの正規署名を指定
+    spoofedPackageSignature = "e682fe0bcd60907dfed515e0b8a4de03aa1c281d111a07833986602b6098afd2", // LINEの正規署名を指定
     gmsCoreVendorGroupIdOption = gmsCoreVendorGroupIdOption,
     packageNameYouTubeOption = packageNameLineOption, // LINEのパッケージ名を使用
     packageNameYouTubeMusicOption = packageNameLineOption, // LINEのパッケージ名を使用
@@ -48,6 +67,6 @@ private fun gmsCoreSupportResourcePatch(
 ) {
     dependsOn(
         settingsPatch, // 必要な依存関係を追加
-        sharedExtensionPatch // LINE用の拡張パッチ
+        sharedExtensionPatch // LINE用の拡張パッチを依存関係に追加
     )
 }
