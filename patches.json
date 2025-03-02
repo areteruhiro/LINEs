@@ -1,0 +1,15 @@
+[
+  {
+    "name": "LINE Package Spoof",
+    "description": "偽装されたLINEパッケージ情報と署名を使用します。",
+    "compatiblePackages": [
+      {
+        "name": "jp.naver.line.android",
+        "versions": null 
+      }
+    ],
+    "use": true,
+    "requiresIntegrations": false,
+    "options": []
+  }
+]
